@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Amba AI Chat 🤖</title>
+
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#0f0f0f;
+  color:white;
+  display:flex;
+  height:100vh;
+}
+
+/* sidebar */
+.sidebar{
+  width:220px;
+  background:#171717;
+  padding:10px;
+  overflow:auto;
+}
+
+.historyItem{
+  padding:8px;
+  margin-bottom:6px;
+  background:#222;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:13px;
+}
+
+/* chat area */
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+.header{
+  padding:12px;
+  background:#1f1f1f;
+  font-weight:bold;
+}
+
+.chat{
+  flex:1;
+  overflow:auto;
+  padding:10px;
+}
+
+.msg{
+  max-width:75%;
+  padding:10px;
+  margin:6px 0;
+  border-radius:12px;
+}
+
+.me{
+  background:#2563eb;
+  margin-left:auto;
+}
+
+.bot{
+  background:#2a2a2a;
+}
+
+.inputBox{
+  display:flex;
+  padding:10px;
+  background:#1f1f1f;
+  gap:6px;
+}
+
+input{
+  flex:1;
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  padding:10px 12px;
+  border:none;
+  border-radius:8px;
+  background:#2563eb;
+  color:white;
+  cursor:pointer;
+}
+</style>
+</head>
+
+
+<body>
+
+<div class="sidebar">
+  <button onclick="newChat()">➕ New Chat</button>
+  <div id="history"></div>
+</div>
+
+<div class="main">
+  <div class="header">🤖 Amba AI Assistant</div>
+  <div id="chat" class="chat"></div>
+
+  <div class="inputBox">
+    <button onclick="startVoice()">🎤</button>
+    <input id="text" placeholder="Tanya apa aja..." />
+    <button onclick="send()">Kirim</button>
+  </div>
+</div>
+
+
+<script>
+/* =======================
+   🔑 MASUKIN API KEY DISINI
+======================= */
+const API_KEY = AIzaSyC79s1x3PYGtB_vdmFZJdxRIBbX3f7HknM
+/* ======================= */
+
+
+const chatBox = document.getElementById("chat");
+const historyBox = document.getElementById("history");
+
+let chats = [];
+let current = [];
+
+
+/* ===== FILTER KATA TERLARANG ===== */
+function isBad(text){
+  const bad = ["narkoba","bom","bunuh","hack akun","carding","bokep"];
+  return bad.some(w=>text.toLowerCase().includes(w));
+}
+
+
+/* ===== UI ===== */
+function add(text, cls){
+  const d=document.createElement("div");
+  d.className="msg "+cls;
+  d.textContent=text;
+  chatBox.appendChild(d);
+  chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+
+function newChat(){
+  if(current.length){
+    chats.push([...current]);
+    saveHistory();
+  }
+  current=[];
+  chatBox.innerHTML="";
+}
+
+
+function saveHistory(){
+  localStorage.setItem("ai_history", JSON.stringify(chats));
+  renderHistory();
+}
+
+
+function renderHistory(){
+  historyBox.innerHTML="";
+  chats.forEach((c,i)=>{
+    const div=document.createElement("div");
+    div.className="historyItem";
+    div.textContent=c[0]?.slice(0,20)+"...";
+    div.onclick=()=>{
+      chatBox.innerHTML="";
+      current=[...c];
+      current.forEach(m=>add(m.text,m.role));
+    };
+    historyBox.appendChild(div);
+  });
+}
+
+
+/* ===== AI CALL GEMINI ===== */
+async function askAI(prompt){
+
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+API_KEY,
+    {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        contents:[{ parts:[{ text:prompt }] }]
+      })
+    }
+  );
+
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Error bro 😅";
+}
+
+
+/* ===== SEND ===== */
+async function send(){
+  const input=document.getElementById("text");
+  const text=input.value.trim();
+  if(!text) return;
+
+  if(isBad(text)){
+    add("Pertanyaan tidak diperbolehkan ❌", "bot");
+    return;
+  }
+
+  add(text,"me");
+  current.push({role:"me",text});
+  input.value="";
+
+  add("Typing...", "bot");
+
+  const reply = await askAI(text);
+
+  chatBox.lastChild.remove();
+
+  add(reply,"bot");
+  current.push({role:"bot",text:reply});
+}
+
+
+/* ===== VOICE TO TEXT ===== */
+function startVoice(){
+  const rec = new webkitSpeechRecognition();
+  rec.lang="id-ID";
+  rec.start();
+
+  rec.onresult = e=>{
+    document.getElementById("text").value = e.results[0][0].transcript;
+  };
+}
+
+
+/* load history */
+const saved = localStorage.getItem("ai_history");
+if(saved){
+  chats = JSON.parse(saved);
+  renderHistory();
+}
+</script>
+
+</body>
+  </html>
